@@ -22,6 +22,9 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.BitmapFactory.Options;
+import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.RectF;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -30,12 +33,17 @@ import android.os.Bundle;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
 import android.view.View;
 import android.view.WindowManager;
+import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.Toast;
+
+import java.util.ArrayList;
 
 /**
  * This is an example of using the accelerometer to integrate the device's
@@ -52,11 +60,13 @@ import android.widget.Toast;
 public class AccelerometerPlayActivity extends Activity {
 
     private SimulationView mSimulationView;
+    private ViewGroup mLayout;
     private SensorManager mSensorManager;
     private PowerManager mPowerManager;
     private WindowManager mWindowManager;
     private Display mDisplay;
     private WakeLock mWakeLock;
+    private Button mRestartButton;
 
     /** Called when the activity is first created. */
     @Override
@@ -72,14 +82,29 @@ public class AccelerometerPlayActivity extends Activity {
         // Get an instance of the WindowManager
         mWindowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         mDisplay = mWindowManager.getDefaultDisplay();
-
         // Create a bright wake lock
         mWakeLock = mPowerManager.newWakeLock(PowerManager.SCREEN_BRIGHT_WAKE_LOCK, getClass()
                 .getName());
 
+        mRestartButton = new Button(getApplicationContext());
+        mRestartButton.setText("Restart Game");
+        mRestartButton.setTextColor(Color.parseColor("#000000"));
+        mRestartButton.setTextSize(12);
+        mRestartButton.setPadding(10,10,10,10);
         // instantiate our simulation view and set it as the activity's content
         mSimulationView = new SimulationView(this);
-        setContentView(mSimulationView);
+        mRestartButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mSimulationView.seeStuff(v.getContext());
+            }
+        });
+        mSimulationView.setPadding(0,50,0,0);
+        mLayout = new LinearLayout(getApplicationContext());
+        ((LinearLayout)mLayout).setOrientation(LinearLayout.VERTICAL);
+        mLayout.addView(mRestartButton);
+        mLayout.addView(mSimulationView);
+        setContentView(mLayout);
     }
 
     @Override
@@ -137,8 +162,7 @@ public class AccelerometerPlayActivity extends Activity {
         private long mCpuTimeStamp;
         private float mHorizontalBound;
         private float mVerticalBound;
-        private final ParticleSystem mParticleSystem = new ParticleSystem();
-        private Button mRestartButton;
+        private final CellSystem mCellSystem;
 
         /*
          * Each of our particle holds its previous and current position, its
@@ -157,8 +181,7 @@ public class AccelerometerPlayActivity extends Activity {
             Particle() {
                 // make each particle a bit different by randomizing its
                 // coefficient of friction
-                final float r = ((float) Math.random() - 0.5f) * 0.2f;
-                mOneMinusFriction = 1.0f - sFriction + r;
+                mOneMinusFriction = 1.0f - sFriction;
             }
 
             public void computePhysics(float sx, float sy, float dT, float dTC) {
@@ -222,20 +245,100 @@ public class AccelerometerPlayActivity extends Activity {
             }
         }
 
+        class Cell {
+            private boolean mFilled = false;
+            private RectF mRect;
+            private Paint mPaint;
+            private float mX;
+            private float mY;
+            private float mWidth;
+            private float mHeight;
+            private boolean mInMaze;
+            private boolean mIsEnd;
+            private boolean updated;
+
+            Cell(float aX, float aY, float aWidth, float aHeight) {
+                mFilled = false;
+                mRect = new RectF(aX, aY, aX + aWidth, aY + aHeight);
+                mX = aX;
+                mY = aY;
+                mWidth = aWidth;
+                mHeight = aHeight;
+                mPaint = new Paint();
+            }
+
+            public void MakeWall() {
+                mPaint.setColor(0xff3B2C20);
+                mFilled = true;
+            }
+
+            public void MakeColored(int i) {
+                switch(i){
+                    case -1:
+                        if(mFilled == true)
+                            mPaint.setColor(0xff3B2C20);
+                        else
+                            mPaint.setColor(0x00000000);
+                    case 0:
+                        mPaint.setColor(0xffffff00);
+                        break;
+                    case 1:
+                        mPaint.setColor(0xffff00ff);
+                        break;
+                    case 2:
+                        mPaint.setColor(0xff00ffff);
+                        break;
+                }
+            }
+
+            public void MakeOpening()
+            {
+                mPaint.setColor(0x00000000);
+                mFilled = false;
+            }
+            public void Draw(Canvas canvas)
+            {
+                canvas.drawRect(mRect, mPaint);
+            }
+        }
+
         /*
          * A particle system is just a collection of particles
          */
-        class ParticleSystem {
+        class CellSystem {
             static final int NUM_PARTICLES = 1;
-            private Particle mBalls[] = new Particle[NUM_PARTICLES];
+            private Particle mBall;
+            public Cell[][] mCellArray;
+            private int mWidth;
+            private int mHeight;
+            private float mBallH;
+            private float mBallW;
 
-            ParticleSystem() {
+            CellSystem(float width, float height, float dx, float dy) {
                 /*
                  * Initially our particles have no speed or acceleration
                  */
-                for (int i = 0; i < mBalls.length; i++) {
-                    mBalls[i] = new Particle();
+                mBall = new Particle();
+                mWidth = (int) (width / dx);
+                mBallW = dx;
+                mBallH = dy;
+                mHeight = (int) (height / dy);
+                mCellArray = new Cell[mWidth][mHeight];
+                for (int i = 0; i < mWidth; i++) {
+                    for (int j = 0; j < mHeight; j++) {
+                        mCellArray[i][j] = new Cell(i * dx, j * dx, dx, dy);
+                        if (i == mWidth - 1 || i == 0)
+                            mCellArray[i][j].MakeWall();
+                        else if (j == mHeight - 1 || j == 0)
+                            mCellArray[i][j].MakeWall();
+                        else
+                            mCellArray[i][j].MakeOpening();
+                    }
                 }
+                mCellArray[1][1].MakeColored(0);
+                mCellArray[1][2].MakeColored(1);
+                mCellArray[1][3].MakeColored(2);
+                mCellArray[4][4].MakeWall();
             }
 
             /*
@@ -245,18 +348,19 @@ public class AccelerometerPlayActivity extends Activity {
             private void updatePositions(float sx, float sy, long timestamp) {
                 final long t = timestamp;
                 if (mLastT != 0) {
-                    final float dT = (float) (t - mLastT) * (1.0f / 1000000000.0f);
+                    final float dT = (float) (t - mLastT) * (1.0f / (1000000000.0f * 1.5f));
                     if (mLastDeltaT != 0) {
                         final float dTC = dT / mLastDeltaT;
-                        final int count = mBalls.length;
-                        for (int i = 0; i < count; i++) {
-                            Particle ball = mBalls[i];
-                            ball.computePhysics(sx, sy, dT, dTC);
-                        }
+                        mBall.computePhysics(sx, sy, dT, dTC);
                     }
                     mLastDeltaT = dT;
                 }
                 mLastT = t;
+            }
+
+            public void reset(float x, float y) {
+                mBall.mPosX = x;
+                mBall.mPosY = y;
             }
 
             /*
@@ -264,69 +368,130 @@ public class AccelerometerPlayActivity extends Activity {
              * position of all the particles and resolving the constraints and
              * collisions.
              */
-            public void update(float sx, float sy, long now) {
+            public void update(float sx, float sy, long now, float xc, float yc, float xs, float ys) {
                 // update the system's positions
                 updatePositions(sx, sy, now);
-
+                mBall.resolveCollisionWithBounds();
                 // We do no more than a limited number of iterations
                 final int NUM_MAX_ITERATIONS = 10;
+                float x = mBall.mPosX + sBallDiameter / 2;
+                float y = mBall.mPosY + sBallDiameter / 2;
+                int bx = (int) (x / mBallW);
+                int by = (int) (y / mBallH);
+                Cell cell;
+                for (int i = -1; i < 2; i++)
+                    for (int j = -1; j < 2; j++) {
+                        if (i == 0 && j == 0)
+                            continue;
+                        try {
+                            cell = mCellArray[bx + i][by + j];
+                        } catch (Exception e) {
+                            continue;
+                        }
+                        if (!cell.mFilled)
+                            continue;
+                        boolean moveX = false;
+                        boolean moveY = false;
+                        float closestX = clamp(x, (cell.mRect.left - xc) / xs , (cell.mRect.right - xc) / xs);
+                        float closestY = clamp(y, (yc - cell.mRect.top) / ys, (yc - cell.mRect.bottom) / ys);
+                        float dx = x - closestX;
+                        float dy = y - closestY;
+                        float dd = dx*dx + dy*dy;
+                        Log.w("Collision", "DD: " + Float.toString(dd) + "SBDD: " + Float.toString(sBallDiameter2));
+                        if(dd < sBallDiameter2 * 4) {
+                            dx += ((float) Math.random() - 0.5f) * 0.0001f;
+                            dy += ((float) Math.random() - 0.5f) * 0.0001f;
+                            dd = dx * dx + dy * dy;
+                            // simulate the spring
+                            final float d = (float) Math.sqrt(dd);
+                            final float c = (0.5f * (sBallDiameter - d)) / d;
+                            mBall.mPosX -= dx * c;
+                            mBall.mPosY -= dy * c;
+                            cell.MakeColored(0);
+                        }
 
+                    }
                 /*
                  * Resolve collisions, each particle is tested against every
                  * other particle for collision. If a collision is detected the
                  * particle is moved away using a virtual spring of infinite
                  * stiffness.
                  */
-                boolean more = true;
+                /*boolean more = true;
                 final int count = mBalls.length;
                 for (int k = 0; k < NUM_MAX_ITERATIONS && more; k++) {
                     more = false;
-                    for (int i = 0; i < count; i++) {
-                        Particle curr = mBalls[i];
-                        for (int j = i + 1; j < count; j++) {
-                            Particle ball = mBalls[j];
-                            float dx = ball.mPosX - curr.mPosX;
-                            float dy = ball.mPosY - curr.mPosY;
-                            float dd = dx * dx + dy * dy;
-                            // Check for collisions
-                            if (dd <= sBallDiameter2) {
-                                /*
-                                 * add a little bit of entropy, after nothing is
-                                 * perfect in the universe.
-                                 */
-                                dx += ((float) Math.random() - 0.5f) * 0.0001f;
-                                dy += ((float) Math.random() - 0.5f) * 0.0001f;
-                                dd = dx * dx + dy * dy;
-                                // simulate the spring
-                                final float d = (float) Math.sqrt(dd);
-                                final float c = (0.5f * (sBallDiameter - d)) / d;
-                                curr.mPosX -= dx * c;
-                                curr.mPosY -= dy * c;
-                                ball.mPosX += dx * c;
-                                ball.mPosY += dy * c;
-                                more = true;
-                            }
+                    Particle curr = mBalls[i];
+                    for (int j = i + 1; j < count; j++) {
+                        Particle ball = mBalls[j];
+                        float dx = ball.mPosX - curr.mPosX;
+                        float dy = ball.mPosY - curr.mPosY;
+                        float dd = dx * dx + dy * dy;
+                        // Check for collisions
+                        if (dd <= sBallDiameter2) {
+                            /*
+                             * add a little bit of entropy, after nothing is
+                             * perfect in the universe.
+                             /
+                            dx += ((float) Math.random() - 0.5f) * 0.0001f;
+                            dy += ((float) Math.random() - 0.5f) * 0.0001f;
+                            dd = dx * dx + dy * dy;
+                            // simulate the spring
+                            final float d = (float) Math.sqrt(dd);
+                            final float c = (0.5f * (sBallDiameter - d)) / d;
+                            curr.mPosX -= dx * c;
+                            curr.mPosY -= dy * c;
+                            ball.mPosX += dx * c;
+                            ball.mPosY += dy * c;
+                            more = true;
                         }
+                    }
+                    */
                         /*
                          * Finally make sure the particle doesn't intersects
                          * with the walls.
                          */
-                        curr.resolveCollisionWithBounds();
+
+            }
+
+            private float clamp(float val, float min, float max) {
+                if(val < min)
+                    return min;
+                else if(val > max)
+                    return max;
+                else
+                    return val;
+            }
+
+            public float getPosX() {
+                return mBall.mPosX;
+            }
+
+            public float getPosY() {
+                return mBall.mPosY;
+            }
+
+            /*public ArrayList<Cell> getNeighbors(float x, float y)
+            {
+                ArrayList<Cell> retval = new ArrayList<Cell>();
+                int bx = (int)(x / mBallW);
+                int by = (int)(y / mBallH);
+                if(bx >= mCellArray.length || by >= mCellArray[0].length)
+                    return retval;
+                if(bx < 0 || by < 0)
+                    return retval;
+
+                return retval;
+            }*/
+
+            public void draw(Canvas canvas) {
+                for (int i = 0; i < mCellArray.length; i++) {
+                    for (int j = 0; j < mCellArray[i].length; j++) {
+                            mCellArray[i][j].Draw(canvas);
                     }
                 }
             }
 
-            public int getParticleCount() {
-                return mBalls.length;
-            }
-
-            public float getPosX(int i) {
-                return mBalls[i].mPosX;
-            }
-
-            public float getPosY(int i) {
-                return mBalls[i].mPosY;
-            }
         }
 
         public void startSimulation() {
@@ -349,11 +514,7 @@ public class AccelerometerPlayActivity extends Activity {
 
 
             mAccelerometer = mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-            mRestartButton = new Button(context);
-            mRestartButton.setText("Restart Game");
-            mRestartButton.setTextColor(Color.parseColor("#000000"));
-            mRestartButton.setTextSize(12);
-            mRestartButton.setPadding(10,10,10,10);
+
 
             DisplayMetrics metrics = new DisplayMetrics();
             getWindowManager().getDefaultDisplay().getMetrics(metrics);
@@ -372,8 +533,13 @@ public class AccelerometerPlayActivity extends Activity {
             opts.inDither = true;
             opts.inPreferredConfig = Bitmap.Config.RGB_565;
             mWood = BitmapFactory.decodeResource(getResources(), R.drawable.wood, opts);
+            mCellSystem = new CellSystem(dstWidth*13, dstHeight*17, dstWidth, dstHeight);
+        }
 
-
+        public void seeStuff(Context context) {
+            this.stopSimulation();
+            mCellSystem.reset(0, 0);
+            this.startSimulation();
         }
 
         @Override
@@ -429,37 +595,29 @@ public class AccelerometerPlayActivity extends Activity {
              * draw the background
              */
 
-            canvas.drawBitmap(mWood, 0, 50, null);
-
+            canvas.drawBitmap(mWood, 0, 0, null);
             /*
              * compute the new position of our object, based on accelerometer
              * data and present time.
              */
 
-            final ParticleSystem particleSystem = mParticleSystem;
+            final CellSystem cellSystem = mCellSystem;
             final long now = mSensorTimeStamp + (System.nanoTime() - mCpuTimeStamp);
             final float sx = mSensorX;
             final float sy = mSensorY;
-
-            particleSystem.update(sx, sy, now);
 
             final float xc = mXOrigin;
             final float yc = mYOrigin;
             final float xs = mMetersToPixelsX;
             final float ys = mMetersToPixelsY;
-            final Bitmap bitmap = mBitmap;
-            final int count = particleSystem.getParticleCount();
-            for (int i = 0; i < count; i++) {
-                /*
-                 * We transform the canvas so that the coordinate system matches
-                 * the sensors coordinate system with the origin in the center
-                 * of the screen and the unit is the meter.
-                 */
 
-                final float x = xc + particleSystem.getPosX(i) * xs;
-                final float y = yc - particleSystem.getPosY(i) * ys;
-                canvas.drawBitmap(bitmap, x, y, null);
-            }
+            cellSystem.update(sx, sy, now, xc, yc, xs, ys);
+            cellSystem.draw(canvas);
+            final Bitmap bitmap = mBitmap;
+
+            final float x = xc + cellSystem.getPosX() * xs;
+            final float y = yc - cellSystem.getPosY() * ys;
+            canvas.drawBitmap(bitmap, x, y, null);
 
             // and make sure to redraw asap
             invalidate();
