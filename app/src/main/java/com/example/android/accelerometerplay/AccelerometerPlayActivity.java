@@ -140,7 +140,7 @@ public class AccelerometerPlayActivity extends Activity {
         // diameter of the balls in meters
         private static final float sBallDiameter = 0.004f;
         private static final float sBallDiameter2 = sBallDiameter * sBallDiameter;
-
+        private Paint mTextPaint;
         // friction of the virtual table and air
         private static final float sFriction = 0.1f;
 
@@ -273,21 +273,23 @@ public class AccelerometerPlayActivity extends Activity {
             }
 
             public void MakeColored(int i) {
-                switch(i){
-                    case -1:
-                        if(mFilled == true)
-                            mPaint.setColor(0xff3B2C20);
-                        else
-                            mPaint.setColor(0x00000000);
-                    case 0:
-                        mPaint.setColor(0xffffff00);
-                        break;
-                    case 1:
-                        mPaint.setColor(0xffff00ff);
-                        break;
-                    case 2:
-                        mPaint.setColor(0xff00ffff);
-                        break;
+                if(i == -1)
+                    if(mFilled == true)
+                        mPaint.setColor(0xff3B2C20);
+                    else
+                        mPaint.setColor(0x00000000);
+                else {
+                    switch (i) {
+                        case 0:
+                            mPaint.setColor(0xffffff00);
+                            break;
+                        case 1:
+                            mPaint.setColor(0xffff00ff);
+                            break;
+                        case 2:
+                            mPaint.setColor(0xff00ffff);
+                            break;
+                    }
                 }
             }
 
@@ -335,10 +337,6 @@ public class AccelerometerPlayActivity extends Activity {
                             mCellArray[i][j].MakeOpening();
                     }
                 }
-                mCellArray[1][1].MakeColored(0);
-                mCellArray[1][2].MakeColored(1);
-                mCellArray[1][3].MakeColored(2);
-                mCellArray[4][4].MakeWall();
             }
 
             /*
@@ -351,7 +349,7 @@ public class AccelerometerPlayActivity extends Activity {
                     final float dT = (float) (t - mLastT) * (1.0f / (1000000000.0f * 1.5f));
                     if (mLastDeltaT != 0) {
                         final float dTC = dT / mLastDeltaT;
-                        mBall.computePhysics(sx, sy, dT, dTC);
+                        mBall.computePhysics(sx/2, sy/2, dT, dTC);
                     }
                     mLastDeltaT = dT;
                 }
@@ -361,6 +359,15 @@ public class AccelerometerPlayActivity extends Activity {
             public void reset(float x, float y) {
                 mBall.mPosX = x;
                 mBall.mPosY = y;
+                mBall.mAccelX = 0;
+                mBall.mAccelY = 0;
+                mBall.mLastPosX = x;
+                mBall.mLastPosY = y;
+                mBall.resolveCollisionWithBounds();
+                for(Cell[] clist : mCellArray)
+                    for(Cell c : clist) {
+                        c.MakeColored(-1);
+                    }
             }
 
             /*
@@ -374,84 +381,87 @@ public class AccelerometerPlayActivity extends Activity {
                 mBall.resolveCollisionWithBounds();
                 // We do no more than a limited number of iterations
                 final int NUM_MAX_ITERATIONS = 10;
-                float x = mBall.mPosX + sBallDiameter / 2;
-                float y = mBall.mPosY + sBallDiameter / 2;
+                float x = xc + (mBall.mPosX*xs + sBallDiameter / 2*xs);
+                float y = yc - (mBall.mPosY*ys - sBallDiameter / 2*ys);
                 int bx = (int) (x / mBallW);
                 int by = (int) (y / mBallH);
+                if(bx < 0)
+                    bx = 0;
+                if(by < 0)
+                    by = 0;
+                if(bx > mCellArray.length - 1)
+                    bx = mCellArray.length - 1;
+                if(by > mCellArray[bx].length - 1)
+                    by = mCellArray.length - 1;
+                float dx;
+                float dy;
                 Cell cell;
-                for (int i = -1; i < 2; i++)
-                    for (int j = -1; j < 2; j++) {
-                        if (i == 0 && j == 0)
-                            continue;
-                        try {
-                            cell = mCellArray[bx + i][by + j];
-                        } catch (Exception e) {
-                            continue;
-                        }
-                        if (!cell.mFilled)
-                            continue;
-                        boolean moveX = false;
-                        boolean moveY = false;
-                        float closestX = clamp(x, (cell.mRect.left - xc) / xs , (cell.mRect.right - xc) / xs);
-                        float closestY = clamp(y, (yc - cell.mRect.top) / ys, (yc - cell.mRect.bottom) / ys);
-                        float dx = x - closestX;
-                        float dy = y - closestY;
-                        float dd = dx*dx + dy*dy;
-                        Log.w("Collision", "DD: " + Float.toString(dd) + "SBDD: " + Float.toString(sBallDiameter2));
-                        if(dd < sBallDiameter2 * 4) {
-                            dx += ((float) Math.random() - 0.5f) * 0.0001f;
-                            dy += ((float) Math.random() - 0.5f) * 0.0001f;
-                            dd = dx * dx + dy * dy;
-                            // simulate the spring
-                            final float d = (float) Math.sqrt(dd);
-                            final float c = (0.5f * (sBallDiameter - d)) / d;
-                            mBall.mPosX -= dx * c;
-                            mBall.mPosY -= dy * c;
-                            cell.MakeColored(0);
-                        }
-
+                int[] indexX = {-1, 0, 0, 1, 0};
+                int[] indexY = {0, 1, -1, 0, 0};
+                for (int index = 0; index < 4; index++) {
+                    int i = indexX[index];
+                    int j = indexY[index];
+                    if (i == 0 && j == 0)
+                        continue;
+                    try {
+                        cell = mCellArray[bx + i][by + j];
+                    } catch (Exception e) {
+                        continue;
                     }
-                /*
-                 * Resolve collisions, each particle is tested against every
-                 * other particle for collision. If a collision is detected the
-                 * particle is moved away using a virtual spring of infinite
-                 * stiffness.
-                 */
-                /*boolean more = true;
-                final int count = mBalls.length;
-                for (int k = 0; k < NUM_MAX_ITERATIONS && more; k++) {
-                    more = false;
-                    Particle curr = mBalls[i];
-                    for (int j = i + 1; j < count; j++) {
-                        Particle ball = mBalls[j];
-                        float dx = ball.mPosX - curr.mPosX;
-                        float dy = ball.mPosY - curr.mPosY;
-                        float dd = dx * dx + dy * dy;
-                        // Check for collisions
-                        if (dd <= sBallDiameter2) {
-                            /*
-                             * add a little bit of entropy, after nothing is
-                             * perfect in the universe.
-                             /
-                            dx += ((float) Math.random() - 0.5f) * 0.0001f;
-                            dy += ((float) Math.random() - 0.5f) * 0.0001f;
-                            dd = dx * dx + dy * dy;
-                            // simulate the spring
-                            final float d = (float) Math.sqrt(dd);
-                            final float c = (0.5f * (sBallDiameter - d)) / d;
-                            curr.mPosX -= dx * c;
-                            curr.mPosY -= dy * c;
-                            ball.mPosX += dx * c;
-                            ball.mPosY += dy * c;
-                            more = true;
-                        }
-                    }
-                    */
-                        /*
-                         * Finally make sure the particle doesn't intersects
-                         * with the walls.
-                         */
+                    if (!cell.mFilled)
+                        continue;
 
+                    boolean moveX = false;
+                    boolean moveY = false;
+                    float intersectX = 0;
+                    float intersectY = 0;
+                    switch (i) {
+                        case -1:
+                            moveX = cell.mX + cell.mWidth + sBallDiameter / 2 * xs > x;
+                            break;
+                        case 1:
+                            moveX = cell.mX - sBallDiameter / 2 * xs < x;
+                            break;
+                    }
+                    switch (j) {
+                        case -1:
+                            moveY = cell.mY + cell.mHeight + sBallDiameter / 2 * ys > y;
+                            break;
+                        case 1:
+                            moveY = cell.mY - sBallDiameter / 2 * ys < y;
+                            break;
+                    }
+                    switch (i) {
+                        case -1:
+                        case 1:
+                            switch (j) {
+                                case 0:
+                                    if (moveX) {
+                                        mBall.mPosX = mBall.mLastPosX;
+                                        mBall.mAccelX = 0;
+                                    }
+                                    break;
+                            }
+                            break;
+                        case 0:
+                            switch (j) {
+                                case -1:
+                                case 1:
+                                    if (moveY) {
+                                        mBall.mPosY = mBall.mLastPosY;
+                                        mBall.mAccelY = 0;
+                                    }
+                                    break;
+                                case 0:
+                                    mBall.mPosY = mBall.mLastPosY;
+                                    mBall.mPosX = mBall.mLastPosX;
+                                    mBall.mAccelX = 0;
+                                    mBall.mAccelY = 0;
+                                    break;
+                            }
+                            break;
+                    }
+                }
             }
 
             private float clamp(float val, float min, float max) {
@@ -533,7 +543,10 @@ public class AccelerometerPlayActivity extends Activity {
             opts.inDither = true;
             opts.inPreferredConfig = Bitmap.Config.RGB_565;
             mWood = BitmapFactory.decodeResource(getResources(), R.drawable.wood, opts);
-            mCellSystem = new CellSystem(dstWidth*13, dstHeight*17, dstWidth, dstHeight);
+            mCellSystem = new CellSystem(mWood.getWidth()-100, mWood.getHeight() - 100, dstWidth, dstHeight);
+            mTextPaint = new Paint();
+            mTextPaint.setColor(Color.parseColor("white"));
+            mTextPaint.setTextSize(12);
         }
 
         public void seeStuff(Context context) {
@@ -548,8 +561,8 @@ public class AccelerometerPlayActivity extends Activity {
             // the bitmap
             mXOrigin = (w - mBitmap.getWidth()) * 0.5f;
             mYOrigin = (h - mBitmap.getHeight()) * 0.5f;
-            mHorizontalBound = ((w / mMetersToPixelsX - sBallDiameter) * 0.5f);
-            mVerticalBound = ((h / mMetersToPixelsY - sBallDiameter) * 0.5f);
+            mHorizontalBound = ((w / mMetersToPixelsX - sBallDiameter * 2f) * 0.5f);
+            mVerticalBound = ((h / mMetersToPixelsY - sBallDiameter * 2f) * 0.5f);
         }
 
         @Override
@@ -611,14 +624,15 @@ public class AccelerometerPlayActivity extends Activity {
             final float xs = mMetersToPixelsX;
             final float ys = mMetersToPixelsY;
 
-            cellSystem.update(sx, sy, now, xc, yc, xs, ys);
+            cellSystem.update(sx/2, sy/2, now, xc, yc, xs, ys);
             cellSystem.draw(canvas);
             final Bitmap bitmap = mBitmap;
 
             final float x = xc + cellSystem.getPosX() * xs;
             final float y = yc - cellSystem.getPosY() * ys;
             canvas.drawBitmap(bitmap, x, y, null);
-
+            String text = "X:" + String.format("%.2f", x) + " Y:" + String.format("%.2f", y);
+            canvas.drawText(text, 0, text.length() - 1, x + sBallDiameter * xs * 1.01f, y + sBallDiameter * ys * 1.01f, mTextPaint);
             // and make sure to redraw asap
             invalidate();
         }
