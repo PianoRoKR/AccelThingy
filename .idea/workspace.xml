@@ -28,8 +28,7 @@
     <option name="TOOL_WINDOW_CONFIGURED_FILTER" value="app: com.example.android.accelerometerplay" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="21d8fb9b-f7aa-4a11-9115-117117e2aa50" name="Default" comment="Cosdfpoxcvdsfeio">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/app/src/main/java/com/example/android/accelerometerplay/AccelerometerPlayActivity.java" afterPath="$PROJECT_DIR$/app/src/main/java/com/example/android/accelerometerplay/AccelerometerPlayActivity.java" />
+    <list default="true" id="21d8fb9b-f7aa-4a11-9115-117117e2aa50" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
     </list>
     <ignored path="AccelerometerPlay.iws" />
@@ -1245,6 +1244,11 @@
       <created>1418695381177</created>
       <updated>1418695381177</updated>
     </task>
+    <task id="LOCAL-00001" summary="Collision Detection is now working well enough for a maze. (stupid acceleration)">
+      <created>1418938150817</created>
+      <updated>1418938150817</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TodoView" selected-index="0">
@@ -1283,7 +1287,7 @@
       <window_info id="Gradle Console" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="7" side_tool="true" content_ui="tabs" />
       <window_info id="Build Variants" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="2" side_tool="true" content_ui="tabs" />
       <window_info id="Messages" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.30888888" sideWeight="0.5" order="7" side_tool="false" content_ui="tabs" />
-      <window_info id="Android" active="true" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.34777778" sideWeight="0.739339" order="7" side_tool="false" content_ui="tabs" />
+      <window_info id="Android" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.34777778" sideWeight="0.739339" order="7" side_tool="false" content_ui="tabs" />
       <window_info id="Gradle" active="false" anchor="right" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="3" side_tool="false" content_ui="tabs" />
       <window_info id="TODO" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.3298969" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
       <window_info id="Structure" active="false" anchor="left" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="true" weight="0.17750533" sideWeight="0.5" order="1" side_tool="false" content_ui="tabs" />
@@ -1348,7 +1352,8 @@
       <TodoPanelSettings />
     </option>
     <MESSAGE value="Added walls, a grid, and provided a framework which might allow collision detection" />
-    <option name="LAST_COMMIT_MESSAGE" value="Added walls, a grid, and provided a framework which might allow collision detection" />
+    <MESSAGE value="Collision Detection is now working well enough for a maze. (stupid acceleration)" />
+    <option name="LAST_COMMIT_MESSAGE" value="Collision Detection is now working well enough for a maze. (stupid acceleration)" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
