@@ -24,6 +24,7 @@ import android.graphics.Canvas;
 import android.graphics.BitmapFactory.Options;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Point;
 import android.graphics.RectF;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -255,6 +256,7 @@ public class AccelerometerPlayActivity extends Activity {
             private float mHeight;
             private boolean mInMaze;
             private boolean mIsEnd;
+            private boolean mIsStart;
             private boolean updated;
 
             Cell(float aX, float aY, float aWidth, float aHeight) {
@@ -298,6 +300,20 @@ public class AccelerometerPlayActivity extends Activity {
                 mPaint.setColor(0x00000000);
                 mFilled = false;
             }
+
+            public void MakeStart()
+            {
+                mPaint.setColor(0xffffff00);
+                mFilled = false;
+                mIsStart = true;
+            }
+
+            public void MakeEnd()
+            {
+                mPaint.setColor(0x00ff0000);
+                mFilled = false;
+                mIsEnd = true;
+            }
             public void Draw(Canvas canvas)
             {
                 canvas.drawRect(mRect, mPaint);
@@ -311,10 +327,35 @@ public class AccelerometerPlayActivity extends Activity {
             static final int NUM_PARTICLES = 1;
             private Particle mBall;
             public Cell[][] mCellArray;
+            Cell mStart;
+            Cell mEnd;
             private int mWidth;
             private int mHeight;
             private float mBallH;
             private float mBallW;
+            private float mXOrigin;
+            private float mYOrigin;
+            private float mMetersToPixelsX;
+            private float mMetersToPixelsY;
+
+            class Point{
+                Integer x;
+                Integer y;
+                Point parent;
+                public Point(int x, int y, Point p){
+                    this.x=x;
+                    this.y=y;
+                    parent=p;
+                }
+                // compute opposite node given that it is in the other direction from the parent
+                public Point opposite(){
+                    if(this.x.compareTo(parent.x)!=0)
+                        return new Point(this.x+this.x.compareTo(parent.x),this.y,this);
+                    if(this.y.compareTo(parent.y)!=0)
+                        return new Point(this.x,this.y+this.y.compareTo(parent.y),this);
+                    return null;
+                }
+            }
 
             CellSystem(float width, float height, float dx, float dy) {
                 /*
@@ -329,16 +370,82 @@ public class AccelerometerPlayActivity extends Activity {
                 for (int i = 0; i < mWidth; i++) {
                     for (int j = 0; j < mHeight; j++) {
                         mCellArray[i][j] = new Cell(i * dx, j * dx, dx, dy);
-                        if (i == mWidth - 1 || i == 0)
-                            mCellArray[i][j].MakeWall();
-                        else if (j == mHeight - 1 || j == 0)
-                            mCellArray[i][j].MakeWall();
-                        else
-                            mCellArray[i][j].MakeOpening();
                     }
                 }
+                CreateMaze();
             }
 
+            public void CreateMaze()
+            {
+                // Initialize everything to a wall.
+                for(Cell[] cells : mCellArray)
+                    for(Cell c : cells)
+                    {
+                        c.MakeWall();
+                    }
+                Point start = new Point((int)(Math.random()*mWidth), (int)(Math.random()*mHeight), null);
+                mStart = mCellArray[start.x][start.y];
+                mStart.MakeStart();
+
+                ArrayList<Point> frontier = new ArrayList<Point>();
+                for(int x = -1; x < 2; x++)
+                    for(int y = -1; y < 2; y++) {
+                        if (x == 0 && y == 0 || x != 0 && y != 0)
+                            continue;
+                        try {
+                            if(!mCellArray[start.x + x][start.y + y].mFilled)
+                                continue;
+                        }
+                        catch(IndexOutOfBoundsException e)
+                        { // Ignore bad indices if we're close to an edge
+                            continue;
+                        }
+                        frontier.add(new Point(start.x + x, start.y + y, start));
+                    }
+                Point last = null;
+                while(!frontier.isEmpty()) {
+
+                    // pick current node at random
+                    Point current = frontier.remove((int) (Math.random() * frontier.size()));
+                    Point opposite = current.opposite();
+                    try {
+                        // if both node and its opposite are walls
+                        if (mCellArray[current.x][current.y].mFilled) {
+                            if (mCellArray[opposite.x][opposite.y].mFilled) {
+
+                                // open path between the nodes
+                                mCellArray[current.x][current.y].MakeOpening();
+                                mCellArray[opposite.x][opposite.y].MakeOpening();
+
+                                // store last node in order to mark it later
+                                last = opposite;
+
+                                // iterate through direct neighbors of node, same as earlier
+                                for (int x = -1; x < 2; x++)
+                                    for (int y = -1; y < 2; y++) {
+                                        if (x == 0 && y == 0 || x != 0 && y != 0)
+                                            continue;
+                                        try {
+                                            if (!mCellArray[opposite.x + x][opposite.y + y].mFilled)
+                                                continue;
+                                        } catch (IndexOutOfBoundsException e) {
+                                            continue;
+                                        }
+                                        frontier.add(new Point(opposite.x + x, opposite.y + y, opposite));
+                                    }
+                            }
+                        }
+                    } catch (Exception e) { // ignore NullPointer and ArrayIndexOutOfBounds
+                    }
+
+                    // if algorithm has resolved, mark end node
+                    if (frontier.isEmpty()) {
+                        mEnd = mCellArray[last.x][last.y];
+                        mEnd.MakeEnd();
+                    }
+                }
+                reset((mStart.mX - mXOrigin)/mMetersToPixelsX, (mYOrigin - mStart.mY)/mMetersToPixelsY);
+            }
             /*
              * Update the position of each particle in the system using the
              * Verlet integrator.
@@ -364,10 +471,6 @@ public class AccelerometerPlayActivity extends Activity {
                 mBall.mLastPosX = x;
                 mBall.mLastPosY = y;
                 mBall.resolveCollisionWithBounds();
-                for(Cell[] clist : mCellArray)
-                    for(Cell c : clist) {
-                        c.MakeColored(-1);
-                    }
             }
 
             /*
@@ -375,7 +478,7 @@ public class AccelerometerPlayActivity extends Activity {
              * position of all the particles and resolving the constraints and
              * collisions.
              */
-            public void update(float sx, float sy, long now, float xc, float yc, float xs, float ys) {
+            public boolean update(float sx, float sy, long now, float xc, float yc, float xs, float ys) {
                 // update the system's positions
                 updatePositions(sx, sy, now);
                 mBall.resolveCollisionWithBounds();
@@ -462,6 +565,16 @@ public class AccelerometerPlayActivity extends Activity {
                             break;
                     }
                 }
+                x = xc + (mBall.mPosX*xs + sBallDiameter / 2*xs);
+                y = yc - (mBall.mPosY*ys - sBallDiameter / 2*ys);
+                bx = (int) (x / mBallW);
+                by = (int) (y / mBallH);
+                try {
+                    return mCellArray[bx][by].mIsEnd;
+                }
+                catch(Exception e) {
+                    return false;
+                }
             }
 
             private float clamp(float val, float min, float max) {
@@ -543,7 +656,7 @@ public class AccelerometerPlayActivity extends Activity {
             opts.inDither = true;
             opts.inPreferredConfig = Bitmap.Config.RGB_565;
             mWood = BitmapFactory.decodeResource(getResources(), R.drawable.wood, opts);
-            mCellSystem = new CellSystem(mWood.getWidth()-100, mWood.getHeight() - 100, dstWidth, dstHeight);
+            mCellSystem = new CellSystem(mWood.getWidth(), mWood.getHeight(), dstWidth, dstHeight);
             mTextPaint = new Paint();
             mTextPaint.setColor(Color.parseColor("white"));
             mTextPaint.setTextSize(12);
@@ -551,7 +664,7 @@ public class AccelerometerPlayActivity extends Activity {
 
         public void seeStuff(Context context) {
             this.stopSimulation();
-            mCellSystem.reset(0, 0);
+            mCellSystem.CreateMaze();
             this.startSimulation();
         }
 
@@ -561,8 +674,8 @@ public class AccelerometerPlayActivity extends Activity {
             // the bitmap
             mXOrigin = (w - mBitmap.getWidth()) * 0.5f;
             mYOrigin = (h - mBitmap.getHeight()) * 0.5f;
-            mHorizontalBound = ((w / mMetersToPixelsX - sBallDiameter * 2f) * 0.5f);
-            mVerticalBound = ((h / mMetersToPixelsY - sBallDiameter * 2f) * 0.5f);
+            mHorizontalBound = ((w / mMetersToPixelsX - sBallDiameter) * 0.5f);
+            mVerticalBound = ((h / mMetersToPixelsY - sBallDiameter) * 0.5f);
         }
 
         @Override
@@ -623,8 +736,8 @@ public class AccelerometerPlayActivity extends Activity {
             final float yc = mYOrigin;
             final float xs = mMetersToPixelsX;
             final float ys = mMetersToPixelsY;
-
-            cellSystem.update(sx/2, sy/2, now, xc, yc, xs, ys);
+            boolean isFinished = false;
+            isFinished = cellSystem.update(sx/2, sy/2, now, xc, yc, xs, ys);
             cellSystem.draw(canvas);
             final Bitmap bitmap = mBitmap;
 
@@ -633,6 +746,13 @@ public class AccelerometerPlayActivity extends Activity {
             canvas.drawBitmap(bitmap, x, y, null);
             String text = "X:" + String.format("%.2f", x) + " Y:" + String.format("%.2f", y);
             canvas.drawText(text, 0, text.length() - 1, x + sBallDiameter * xs * 1.01f, y + sBallDiameter * ys * 1.01f, mTextPaint);
+
+            if(isFinished)
+            {
+                stopSimulation();
+                canvas.drawText("You won!", 0, 7, mXOrigin, mYOrigin, mTextPaint);
+            }
+
             // and make sure to redraw asap
             invalidate();
         }
