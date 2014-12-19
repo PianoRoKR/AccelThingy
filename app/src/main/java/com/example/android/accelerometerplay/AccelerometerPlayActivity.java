@@ -303,6 +303,64 @@ public class AccelerometerPlayActivity extends Activity {
                 canvas.drawRect(mRect, mPaint);
             }
         }
+		
+		/*
+		 * Prim's algorithm used to generate a random maze.
+		 * Implementation based off Johnathan Zong's implementation of Prim's algorith
+		 * http://jonathanzong.com/blog/2012/11/06/maze-generation-with-prims-algorithm
+		 */
+		class Primmy
+		{
+			public void MakeMaze()
+			{
+				//dimensions of the generated maze
+				int h = 5;
+				int w = 5;
+				
+				//Bulid maze and initialize with only walls
+				StringBuilder s = new StringBuilder(w);
+				for(int i = 0; i < w; i++)
+					s.append('*');
+				char[][] maze = new char[h][w];
+				
+				for(int i = 0; i < h; i++)
+					maze[i] = s.toString().toCharArray();
+				
+				
+				//Select a random point and open as start node
+				// MakeOpening();?
+				Point start = new Point((int)(Math.random() * h), (int)(Math.random()*w), null);
+				maze[start.h][start.w] = 'S';
+				
+				//iterate through direct neighbors of node
+				
+			}
+		}
+		
+		
+		//Throw away class for current Prim implementation.  Can easily convert to a cell.
+		static class Point
+		{
+			Integer r;
+			Integer c;
+			Point parent;
+			
+			public Point(int x, int y, Point p)
+			{
+				this.r = x;
+				this.c = y;
+				this.p = parent;
+			}
+			
+			public Point opposite()
+			{
+				if(this.r.compareTo(parent.r) != 0)
+					return new Point (this.r + this.r.compareTo(parent.r), this.c, this);
+				if(this.c.compareTo(parent.c) != 0)
+					return new Point (this.r, this.c + this.c.compareTo(parent.c), this);
+				return null;
+			}
+		}
 
         /*
          * A particle system is just a collection of particles
