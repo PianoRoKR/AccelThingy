@@ -314,14 +314,14 @@ public class AccelerometerPlayActivity extends Activity {
 			public void MakeMaze()
 			{
 				//dimensions of the generated maze
-				int h = 5;
-				int w = 5;
+				int r = 5;
+				int c = 5;
 				
 				//Bulid maze and initialize with only walls
 				StringBuilder s = new StringBuilder(w);
-				for(int i = 0; i < w; i++)
+				for(int i = 0; i < c; i++)
 					s.append('*');
-				char[][] maze = new char[h][w];
+				char[][] maze = new char[r][c];
 				
 				for(int i = 0; i < h; i++)
 					maze[i] = s.toString().toCharArray();
@@ -329,11 +329,88 @@ public class AccelerometerPlayActivity extends Activity {
 				
 				//Select a random point and open as start node
 				// MakeOpening();?
-				Point start = new Point((int)(Math.random() * h), (int)(Math.random()*w), null);
-				maze[start.h][start.w] = 'S';
+				Point start = new Point((int)(Math.random() * r), (int)(Math.random()*c), null);
+				maze[start.r][start.c] = 'S';
 				
 				//iterate through direct neighbors of node
-				
+				ArrayList<Point> area = new ArrayList<Point>();
+				for(int i = -1; i <= 1; i++)
+					for(int j = -1; j <= 1; j++)
+					{
+						if((i == 0 && j == 0) || (x != 0 && j != 0))
+							continue;
+						try
+						{
+							if(maze[start.r][start.c] == '.') 
+								continue;
+						}
+						catch (Exception e)
+						{
+							continue;
+						}
+						//add eligible points
+						area.add(new Point(start.r + i, start.c + j, start);
+					}
+					
+					Point last = null;
+					
+					while(!area.isEmpty())
+					{
+						//pick current node at random
+						Point cu = area.remove((int)(Math.random() * area.size()));
+						Point op = cu.opposite();
+						try
+						{
+							//if both node and its opposite are walls
+							if(maze[cu.r][cu.c] == '*')
+							{
+								if(maze[cu.r][cu.c] == '*')
+								{
+									//open path between nodes
+									//drawPath
+									maze[cu.r][cu.c] = '.';
+									maze[op.r][cu.c] = '.';
+									
+									//store last node in order to mark it laster
+									last = op;
+									
+									//iterate through direct neighbors of node
+									for(int i = -1; i <= 1; i++)
+										for(int j = -1; j <= 1; j++)
+										{
+											if((i == 0 && j == 0) || (x != 0 && j != 0))
+												continue;
+											try
+											{
+												if(maze[op.r + i][op.c + j] == '.') 
+													continue;
+											}
+											catch (Exception e)
+											{
+												continue;
+											}
+											//add eligible points
+											area.add(new Point(op.r + i, op.c + j, start);
+										}
+								}
+							}
+						
+						}
+						catch(Exception e)
+						{
+							//ignore
+						}
+					}
+					
+					//if algorithm has resolved, mark the end
+					if(area.isEmpty())
+						maze[last.r][last.c] = 'E';
+					
+					//print final maze
+					for(int i = 0; i < r; i++)
+						for(int j = 0; j < c; j++)
+							System.out.print(maze[i][j]);
+						System.our.println();
 			}
 		}
 		
