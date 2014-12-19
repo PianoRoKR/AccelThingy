@@ -270,29 +270,9 @@ public class AccelerometerPlayActivity extends Activity {
             }
 
             public void MakeWall() {
-                mPaint.setColor(0xff3B2C20);
+                //mPaint.setColor(0xff3B2C20);
+                mPaint.setColor(Color.parseColor("yellow"));
                 mFilled = true;
-            }
-
-            public void MakeColored(int i) {
-                if(i == -1)
-                    if(mFilled == true)
-                        mPaint.setColor(0xff3B2C20);
-                    else
-                        mPaint.setColor(0x00000000);
-                else {
-                    switch (i) {
-                        case 0:
-                            mPaint.setColor(0xffffff00);
-                            break;
-                        case 1:
-                            mPaint.setColor(0xffff00ff);
-                            break;
-                        case 2:
-                            mPaint.setColor(0xff00ffff);
-                            break;
-                    }
-                }
             }
 
             public void MakeOpening()
@@ -303,14 +283,14 @@ public class AccelerometerPlayActivity extends Activity {
 
             public void MakeStart()
             {
-                mPaint.setColor(0xffffff00);
+                mPaint.setColor(Color.parseColor("blue"));
                 mFilled = false;
                 mIsStart = true;
             }
 
             public void MakeEnd()
             {
-                mPaint.setColor(0x00ff0000);
+                mPaint.setColor(Color.parseColor("red"));
                 mFilled = false;
                 mIsEnd = true;
             }
@@ -355,6 +335,14 @@ public class AccelerometerPlayActivity extends Activity {
                         return new Point(this.x,this.y+this.y.compareTo(parent.y),this);
                     return null;
                 }
+            }
+
+            public void SetOrigin(float xorigin, float yorigin, float xs, float ys)
+            {
+                mXOrigin = xorigin;
+                mYOrigin = yorigin;
+                mMetersToPixelsX = xs;
+                mMetersToPixelsY = ys;
             }
 
             CellSystem(float width, float height, float dx, float dy) {
@@ -479,6 +467,7 @@ public class AccelerometerPlayActivity extends Activity {
              * collisions.
              */
             public boolean update(float sx, float sy, long now, float xc, float yc, float xs, float ys) {
+                boolean retval = false;
                 // update the system's positions
                 updatePositions(sx, sy, now);
                 mBall.resolveCollisionWithBounds();
@@ -501,6 +490,14 @@ public class AccelerometerPlayActivity extends Activity {
                 Cell cell;
                 int[] indexX = {-1, 0, 0, 1, 0};
                 int[] indexY = {0, 1, -1, 0, 0};
+                try {
+                    if(mCellArray[bx][by].mIsEnd)
+                        retval = true;
+                }
+                catch(Exception e)
+                {
+                    retval = false;
+                }
                 for (int index = 0; index < 4; index++) {
                     int i = indexX[index];
                     int j = indexY[index];
@@ -565,16 +562,7 @@ public class AccelerometerPlayActivity extends Activity {
                             break;
                     }
                 }
-                x = xc + (mBall.mPosX*xs + sBallDiameter / 2*xs);
-                y = yc - (mBall.mPosY*ys - sBallDiameter / 2*ys);
-                bx = (int) (x / mBallW);
-                by = (int) (y / mBallH);
-                try {
-                    return mCellArray[bx][by].mIsEnd;
-                }
-                catch(Exception e) {
-                    return false;
-                }
+                return retval;
             }
 
             private float clamp(float val, float min, float max) {
@@ -676,6 +664,7 @@ public class AccelerometerPlayActivity extends Activity {
             mYOrigin = (h - mBitmap.getHeight()) * 0.5f;
             mHorizontalBound = ((w / mMetersToPixelsX - sBallDiameter) * 0.5f);
             mVerticalBound = ((h / mMetersToPixelsY - sBallDiameter) * 0.5f);
+            mCellSystem.SetOrigin(mXOrigin, mYOrigin, mMetersToPixelsX, mMetersToPixelsY);
         }
 
         @Override
