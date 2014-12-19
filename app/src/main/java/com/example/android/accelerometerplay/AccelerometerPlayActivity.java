@@ -25,6 +25,7 @@ import android.graphics.BitmapFactory.Options;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.PointF;
 import android.graphics.RectF;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -164,7 +165,7 @@ public class AccelerometerPlayActivity extends Activity {
         private float mHorizontalBound;
         private float mVerticalBound;
         private final CellSystem mCellSystem;
-
+        private boolean mRunning;
         /*
          * Each of our particle holds its previous and current position, its
          * acceleration. for added realism each particle has its own friction
@@ -270,22 +271,24 @@ public class AccelerometerPlayActivity extends Activity {
             }
 
             public void MakeWall() {
-                //mPaint.setColor(0xff3B2C20);
-                mPaint.setColor(Color.parseColor("yellow"));
+                mPaint.setColor(0xff3B2C20);
                 mFilled = true;
+                mIsEnd = false;
             }
 
-            public void MakeOpening()
-            {
+            public void MakeOpening() {
                 mPaint.setColor(0x00000000);
                 mFilled = false;
             }
 
-            public void MakeStart()
-            {
+            public void MakeStart() {
                 mPaint.setColor(Color.parseColor("blue"));
                 mFilled = false;
                 mIsStart = true;
+            }
+
+            public void MakeColored() {
+                mPaint.setColor(Color.parseColor("yellow"));
             }
 
             public void MakeEnd()
@@ -350,17 +353,23 @@ public class AccelerometerPlayActivity extends Activity {
                  * Initially our particles have no speed or acceleration
                  */
                 mBall = new Particle();
-                mWidth = (int) (width / dx);
+                mWidth = (int) (width / dx) - 5;
                 mBallW = dx;
                 mBallH = dy;
-                mHeight = (int) (height / dy);
+                mHeight = (int) (height / dy) - 5;
                 mCellArray = new Cell[mWidth][mHeight];
                 for (int i = 0; i < mWidth; i++) {
                     for (int j = 0; j < mHeight; j++) {
                         mCellArray[i][j] = new Cell(i * dx, j * dx, dx, dy);
+                        if(i == 0 || i == mWidth - 1)
+                            mCellArray[i][j].MakeWall();
+                        if(j == 0 || j == mHeight - 1)
+                            mCellArray[i][j].MakeWall();
+                        if((i > 0 && i < mWidth - 1) && (j > 0 && j < mHeight - 1))
+                            mCellArray[i][j].MakeOpening();
                     }
                 }
-                CreateMaze();
+                //CreateMaze();
             }
 
             public void CreateMaze()
@@ -441,7 +450,7 @@ public class AccelerometerPlayActivity extends Activity {
             private void updatePositions(float sx, float sy, long timestamp) {
                 final long t = timestamp;
                 if (mLastT != 0) {
-                    final float dT = (float) (t - mLastT) * (1.0f / (1000000000.0f * 1.5f));
+                    final float dT = (float) (t - mLastT) * (1.0f / (1000000000.0f));
                     if (mLastDeltaT != 0) {
                         final float dTC = dT / mLastDeltaT;
                         mBall.computePhysics(sx/2, sy/2, dT, dTC);
@@ -466,15 +475,17 @@ public class AccelerometerPlayActivity extends Activity {
              * position of all the particles and resolving the constraints and
              * collisions.
              */
-            public boolean update(float sx, float sy, long now, float xc, float yc, float xs, float ys) {
+            public boolean update(float sx, float sy, long now, float xc, float yc, float xs, float ys, Canvas canvas) {
                 boolean retval = false;
                 // update the system's positions
                 updatePositions(sx, sy, now);
                 mBall.resolveCollisionWithBounds();
                 // We do no more than a limited number of iterations
                 final int NUM_MAX_ITERATIONS = 10;
-                float x = xc + (mBall.mPosX*xs + sBallDiameter / 2*xs);
-                float y = yc - (mBall.mPosY*ys - sBallDiameter / 2*ys);
+                float x = mBall.mPosX + sBallDiameter / 2;
+                float y = mBall.mPosY - sBallDiameter / 2;
+                x = convertToPixels(x, true);
+                y = convertToPixels(y, false);
                 int bx = (int) (x / mBallW);
                 int by = (int) (y / mBallH);
                 if(bx < 0)
@@ -487,6 +498,7 @@ public class AccelerometerPlayActivity extends Activity {
                     by = mCellArray.length - 1;
                 float dx;
                 float dy;
+                float m;
                 Cell cell;
                 int[] indexX = {-1, 0, 0, 1, 0};
                 int[] indexY = {0, 1, -1, 0, 0};
@@ -498,71 +510,142 @@ public class AccelerometerPlayActivity extends Activity {
                 {
                     retval = false;
                 }
-                for (int index = 0; index < 4; index++) {
-                    int i = indexX[index];
-                    int j = indexY[index];
-                    if (i == 0 && j == 0)
-                        continue;
-                    try {
-                        cell = mCellArray[bx + i][by + j];
-                    } catch (Exception e) {
-                        continue;
-                    }
-                    if (!cell.mFilled)
-                        continue;
+                for (int i = -1; i < 2; i++)
+                    for(int j = -1; j < 2; j++)
+                    {
+                        x = mBall.mPosX + sBallDiameter / 2;
+                        y = mBall.mPosY - sBallDiameter / 2;
+                        x = convertToPixels(x, true);
+                        y = convertToPixels(y, false);
+                        boolean isX;
+                        if (i == 0 && j == 0)
+                            continue;
+                        try {
+                            cell = mCellArray[bx + i][by + j];
+                        } catch (Exception e) {
+                            continue;
+                        }
+                        if (!cell.mFilled)
+                            continue;
+                        Paint sdf = new Paint();
+                        sdf.setColor(Color.parseColor("white"));
+                        canvas.drawLine(x, y, cell.mRect.centerX(), cell.mRect.centerY(), sdf);
+                        if((i == 0 && j == -1 || j == 1) || (i == -1 || i == 1 && j == 0))
+                        {
+                            switch(i)
+                            {
+                                case 0:
+                                    isX = false;
+                                default:
+                                    isX = true;
+                            }
+                        }
+                        else {
+                            dx = cell.mRect.centerX() - x;
+                            dy = -(cell.mRect.centerY() - y);
+                            m = dx / dy;
 
-                    boolean moveX = false;
-                    boolean moveY = false;
-                    float intersectX = 0;
-                    float intersectY = 0;
-                    switch (i) {
-                        case -1:
-                            moveX = cell.mX + cell.mWidth + sBallDiameter / 2 * xs > x;
-                            break;
-                        case 1:
-                            moveX = cell.mX - sBallDiameter / 2 * xs < x;
-                            break;
-                    }
-                    switch (j) {
-                        case -1:
-                            moveY = cell.mY + cell.mHeight + sBallDiameter / 2 * ys > y;
-                            break;
-                        case 1:
-                            moveY = cell.mY - sBallDiameter / 2 * ys < y;
-                            break;
-                    }
-                    switch (i) {
-                        case -1:
-                        case 1:
-                            switch (j) {
-                                case 0:
-                                    if (moveX) {
-                                        mBall.mPosX = mBall.mLastPosX;
-                                        mBall.mAccelX = 0;
-                                    }
-                                    break;
-                            }
-                            break;
-                        case 0:
-                            switch (j) {
+                            isX = Math.abs(dx / dy) <= 1 && m > 0;
+                            continue;
+                        }
+                        boolean moveX = false;
+                        boolean moveY = false;
+                        dx = 0;
+                        dy = 0;
+                        if(isX)
+                        {
+                            switch(i)
+                            {
                                 case -1:
+                                    moveX = cell.mRect.right + mBallW / 2 > x;
+                                    dx = cell.mRect.right + mBallW / 2;
                                 case 1:
-                                    if (moveY) {
-                                        mBall.mPosY = mBall.mLastPosY;
-                                        mBall.mAccelY = 0;
-                                    }
+                                    moveX = cell.mRect.left - mBallW / 2 < x;
+                                    dx = cell.mRect.left - mBallW / 2;
+                            }
+                        }
+                        else
+                        {
+                            switch(j)
+                            {
+                                case -1:
+                                    moveY = cell.mRect.bottom + mBallH / 2 > y;
+                                    dy = cell.mRect.bottom + mBallH / 2;
+                                case 1:
+                                    moveY = cell.mRect.top - mBallH / 2 < y;
+                                    dy = cell.mRect.top - mBallH / 2;
+                            }
+                        }
+                        if(moveX)
+                        {
+                            mBall.mPosX = convertToMeters(dx, true) - sBallDiameter / 2;
+                            mBall.mAccelX = 0;
+                        }
+                        if(moveY)
+                        {
+                            mBall.mPosY = convertToMeters(dy, false) + sBallDiameter / 2;
+                            mBall.mAccelY = 0;
+                        }
+                        /*float comx = 0;
+                        float comy = 0;
+                        if(isX) {
+                            switch (i) {
+                                case -1:
+                                    comx = cell.mRect.right;
                                     break;
-                                case 0:
-                                    mBall.mPosY = mBall.mLastPosY;
-                                    mBall.mPosX = mBall.mLastPosX;
-                                    mBall.mAccelX = 0;
-                                    mBall.mAccelY = 0;
+                                case 1:
+                                    comx = cell.mRect.left;
                                     break;
                             }
-                            break;
+                            comy = m * (comx - x) + y;
+                        }
+                        else {
+                            if (cell.mRect.bottom > comy || comy > cell.mRect.top) {
+                                switch (j) {
+                                    case -1:
+                                        comy = cell.mRect.bottom;
+                                        break;
+                                    case 1:
+                                        comy = cell.mRect.top;
+                                        break;
+                                }
+                                comx = (comy - y) / m + x;
+                            }
+                        }
+                        Paint other = new Paint();
+                        other.setColor(Color.parseColor("red"));
+                        canvas.drawLine(comx, comy, x, y, other);
+                        dx = comx - x;
+                        dy = comy - y;
+                        float dd = dx * dx + dy * dy;
+                        if(dd > (mBallH / 2) * (mBallW / 2))
+                            continue;
+                        else
+                        {
+                            /*cell.MakeColored();
+                            final float d = (float) Math.sqrt(convertToMeters(dx, true)*convertToMeters(dx, true) + convertToMeters(dy, false)*convertToMeters(dy, false));
+                            final float c = (0.5f * (sBallDiameter - d)) / d;
+                            mBall.mPosX -= convertToMeters(dx, true) * c;
+                            mBall.mPosY -= convertToMeters(dy, true) * c;
+                        }*/
                     }
-                }
                 return retval;
+            }
+            public float convertToMeters(float pos, boolean x)
+            {
+                if(x) {
+                    return (pos - mXOrigin) / mMetersToPixelsX;
+                }
+                else
+                    return (pos + mYOrigin) / mMetersToPixelsY;
+            }
+
+            private float convertToPixels(float pos, boolean x)
+            {
+                if(x)
+                    return mXOrigin + pos * mMetersToPixelsY;
+                else
+                    return mYOrigin - pos * mMetersToPixelsY;
             }
 
             private float clamp(float val, float min, float max) {
@@ -614,10 +697,12 @@ public class AccelerometerPlayActivity extends Activity {
              * CPU resources.
              */
             mSensorManager.registerListener(this, mAccelerometer, SensorManager.SENSOR_DELAY_UI);
+            mRunning = true;
         }
 
         public void stopSimulation() {
             mSensorManager.unregisterListener(this);
+            mRunning = false;
         }
 
         public SimulationView(Context context) {
@@ -644,7 +729,7 @@ public class AccelerometerPlayActivity extends Activity {
             opts.inDither = true;
             opts.inPreferredConfig = Bitmap.Config.RGB_565;
             mWood = BitmapFactory.decodeResource(getResources(), R.drawable.wood, opts);
-            mCellSystem = new CellSystem(mWood.getWidth(), mWood.getHeight(), dstWidth, dstHeight);
+            mCellSystem = new CellSystem(mWood.getWidth(), mWood.getHeight(), dstWidth*1.05f, dstHeight*1.05f);
             mTextPaint = new Paint();
             mTextPaint.setColor(Color.parseColor("white"));
             mTextPaint.setTextSize(12);
@@ -726,22 +811,24 @@ public class AccelerometerPlayActivity extends Activity {
             final float xs = mMetersToPixelsX;
             final float ys = mMetersToPixelsY;
             boolean isFinished = false;
-            isFinished = cellSystem.update(sx/2, sy/2, now, xc, yc, xs, ys);
             cellSystem.draw(canvas);
+            if(mRunning)
+                isFinished = cellSystem.update(sx/2, sy/2, now, xc, yc, xs, ys, canvas);
+
             final Bitmap bitmap = mBitmap;
 
             final float x = xc + cellSystem.getPosX() * xs;
             final float y = yc - cellSystem.getPosY() * ys;
             canvas.drawBitmap(bitmap, x, y, null);
-            String text = "X:" + String.format("%.2f", x) + " Y:" + String.format("%.2f", y);
+            String text = "X:" + String.format("%.4f", mCellSystem.convertToMeters(x, true)) + " Y:" + String.format("%.4f", mCellSystem.convertToMeters(y, false));
             canvas.drawText(text, 0, text.length() - 1, x + sBallDiameter * xs * 1.01f, y + sBallDiameter * ys * 1.01f, mTextPaint);
 
             if(isFinished)
             {
                 stopSimulation();
-                canvas.drawText("You won!", 0, 7, mXOrigin, mYOrigin, mTextPaint);
             }
-
+            if(!mRunning)
+                canvas.drawText("You won!", 0, 7, mXOrigin, mYOrigin, mTextPaint);
             // and make sure to redraw asap
             invalidate();
         }
