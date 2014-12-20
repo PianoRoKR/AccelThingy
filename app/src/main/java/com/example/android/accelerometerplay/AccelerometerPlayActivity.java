@@ -16,16 +16,15 @@
 
 package com.example.android.accelerometerplay;
 
+
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
 import android.graphics.BitmapFactory.Options;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Point;
-import android.graphics.PointF;
 import android.graphics.RectF;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -35,15 +34,13 @@ import android.os.Bundle;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.Display;
 import android.view.Surface;
 import android.view.View;
-import android.view.WindowManager;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.Toast;
 
 import java.util.ArrayList;
 
@@ -143,6 +140,7 @@ public class AccelerometerPlayActivity extends Activity {
         private static final float sBallDiameter = 0.004f;
         private static final float sBallDiameter2 = sBallDiameter * sBallDiameter;
         private Paint mTextPaint;
+
         // friction of the virtual table and air
         private static final float sFriction = 0.1f;
 
@@ -314,8 +312,9 @@ public class AccelerometerPlayActivity extends Activity {
             Cell mEnd;
             private int mWidth;
             private int mHeight;
-            private float mBallH;
-            private float mBallW;
+            private float mCellH;
+            private float mCellW;
+            private float mBallR;
             private float mXOrigin;
             private float mYOrigin;
             private float mMetersToPixelsX;
@@ -354,22 +353,16 @@ public class AccelerometerPlayActivity extends Activity {
                  */
                 mBall = new Particle();
                 mWidth = (int) (width / dx) - 5;
-                mBallW = dx;
-                mBallH = dy;
+                mCellW = dx;
+                mCellH = dy;
                 mHeight = (int) (height / dy) - 5;
                 mCellArray = new Cell[mWidth][mHeight];
                 for (int i = 0; i < mWidth; i++) {
                     for (int j = 0; j < mHeight; j++) {
                         mCellArray[i][j] = new Cell(i * dx, j * dx, dx, dy);
-                        if(i == 0 || i == mWidth - 1)
-                            mCellArray[i][j].MakeWall();
-                        if(j == 0 || j == mHeight - 1)
-                            mCellArray[i][j].MakeWall();
-                        if((i > 0 && i < mWidth - 1) && (j > 0 && j < mHeight - 1))
-                            mCellArray[i][j].MakeOpening();
                     }
                 }
-                //CreateMaze();
+                CreateMaze();
             }
 
             public void CreateMaze()
@@ -470,6 +463,11 @@ public class AccelerometerPlayActivity extends Activity {
                 mBall.resolveCollisionWithBounds();
             }
 
+            public void setBallHW(float h, float w)
+            {
+                mBallR = (h + w) / 2;
+            }
+
             /*
              * Performs one iteration of the simulation. First updating the
              * position of all the particles and resolving the constraints and
@@ -482,12 +480,16 @@ public class AccelerometerPlayActivity extends Activity {
                 mBall.resolveCollisionWithBounds();
                 // We do no more than a limited number of iterations
                 final int NUM_MAX_ITERATIONS = 10;
-                float x = mBall.mPosX + sBallDiameter / 2;
-                float y = mBall.mPosY - sBallDiameter / 2;
+                float x, y;
+                int bx, by;
+                Cell cell;
+                boolean needToCheck = false;
+                x = mBall.mPosX + sBallDiameter / 2;
+                y = mBall.mPosY - sBallDiameter / 2;
                 x = convertToPixels(x, true);
                 y = convertToPixels(y, false);
-                int bx = (int) (x / mBallW);
-                int by = (int) (y / mBallH);
+                bx = (int) (x / mCellW);
+                by = (int) (y / mCellH);
                 if(bx < 0)
                     bx = 0;
                 if(by < 0)
@@ -496,12 +498,6 @@ public class AccelerometerPlayActivity extends Activity {
                     bx = mCellArray.length - 1;
                 if(by > mCellArray[bx].length - 1)
                     by = mCellArray.length - 1;
-                float dx;
-                float dy;
-                float m;
-                Cell cell;
-                int[] indexX = {-1, 0, 0, 1, 0};
-                int[] indexY = {0, 1, -1, 0, 0};
                 try {
                     if(mCellArray[bx][by].mIsEnd)
                         retval = true;
@@ -511,13 +507,11 @@ public class AccelerometerPlayActivity extends Activity {
                     retval = false;
                 }
                 for (int i = -1; i < 2; i++)
-                    for(int j = -1; j < 2; j++)
-                    {
+                    for (int j = -1; j < 2; j++) {
                         x = mBall.mPosX + sBallDiameter / 2;
                         y = mBall.mPosY - sBallDiameter / 2;
                         x = convertToPixels(x, true);
                         y = convertToPixels(y, false);
-                        boolean isX;
                         if (i == 0 && j == 0)
                             continue;
                         try {
@@ -527,108 +521,62 @@ public class AccelerometerPlayActivity extends Activity {
                         }
                         if (!cell.mFilled)
                             continue;
-                        Paint sdf = new Paint();
-                        sdf.setColor(Color.parseColor("white"));
-                        canvas.drawLine(x, y, cell.mRect.centerX(), cell.mRect.centerY(), sdf);
-                        if((i == 0 && j == -1 || j == 1) || (i == -1 || i == 1 && j == 0))
-                        {
-                            switch(i)
-                            {
-                                case 0:
-                                    isX = false;
-                                default:
-                                    isX = true;
-                            }
-                        }
-                        else {
-                            dx = cell.mRect.centerX() - x;
-                            dy = -(cell.mRect.centerY() - y);
-                            m = dx / dy;
+                        Vector2D seg_a, seg_b, seg_v, pt_v, circ_pos, closest, proj_v;
+                        circ_pos = new Vector2D(x, y);
+                        for (int side = 0; side < 4; side++) {
 
-                            isX = Math.abs(dx / dy) <= 1 && m > 0;
-                            continue;
-                        }
-                        boolean moveX = false;
-                        boolean moveY = false;
-                        dx = 0;
-                        dy = 0;
-                        if(isX)
-                        {
-                            switch(i)
-                            {
-                                case -1:
-                                    moveX = cell.mRect.right + mBallW / 2 > x;
-                                    dx = cell.mRect.right + mBallW / 2;
-                                case 1:
-                                    moveX = cell.mRect.left - mBallW / 2 < x;
-                                    dx = cell.mRect.left - mBallW / 2;
-                            }
-                        }
-                        else
-                        {
-                            switch(j)
-                            {
-                                case -1:
-                                    moveY = cell.mRect.bottom + mBallH / 2 > y;
-                                    dy = cell.mRect.bottom + mBallH / 2;
-                                case 1:
-                                    moveY = cell.mRect.top - mBallH / 2 < y;
-                                    dy = cell.mRect.top - mBallH / 2;
-                            }
-                        }
-                        if(moveX)
-                        {
-                            mBall.mPosX = convertToMeters(dx, true) - sBallDiameter / 2;
-                            mBall.mAccelX = 0;
-                        }
-                        if(moveY)
-                        {
-                            mBall.mPosY = convertToMeters(dy, false) + sBallDiameter / 2;
-                            mBall.mAccelY = 0;
-                        }
-                        /*float comx = 0;
-                        float comy = 0;
-                        if(isX) {
-                            switch (i) {
-                                case -1:
-                                    comx = cell.mRect.right;
+                            switch (side) {
+                                case 0:
+                                    seg_a = new Vector2D(cell.mRect.left, cell.mRect.top);
+                                    seg_b = new Vector2D(cell.mRect.right, cell.mRect.top);
                                     break;
                                 case 1:
-                                    comx = cell.mRect.left;
+                                    seg_a = new Vector2D(cell.mRect.left, cell.mRect.bottom);
+                                    seg_b = new Vector2D(cell.mRect.right, cell.mRect.bottom);
+                                    break;
+                                case 2:
+                                    seg_a = new Vector2D(cell.mRect.left, cell.mRect.bottom);
+                                    seg_b = new Vector2D(cell.mRect.left, cell.mRect.top);
+                                    break;
+                                case 3:
+                                    seg_a = new Vector2D(cell.mRect.right, cell.mRect.bottom);
+                                    seg_b = new Vector2D(cell.mRect.right, cell.mRect.top);
+                                    break;
+                                default:
+                                    seg_a = new Vector2D(0, 0);
+                                    seg_b = seg_a;
                                     break;
                             }
-                            comy = m * (comx - x) + y;
-                        }
-                        else {
-                            if (cell.mRect.bottom > comy || comy > cell.mRect.top) {
-                                switch (j) {
-                                    case -1:
-                                        comy = cell.mRect.bottom;
-                                        break;
-                                    case 1:
-                                        comy = cell.mRect.top;
-                                        break;
-                                }
-                                comx = (comy - y) / m + x;
+                            seg_v = seg_b.minus(seg_a);
+                            pt_v = circ_pos.minus(seg_a);
+                            proj_v = seg_v.unitVector().scalarMult(pt_v.dotProduct(seg_v.unitVector()));
+                            if (proj_v.length2() < 0)
+                                closest = new Vector2D(seg_a);
+                            else if (proj_v.length2() > seg_v.length2())
+                                closest = new Vector2D(seg_b);
+                            else {
+                                closest = seg_a.plus(proj_v);
+                            }
+                            if(!(cell.mRect.contains(closest.x, closest.y) ||
+                                    cell.mRect.contains(closest.x, closest.y - 1) ||
+                                    cell.mRect.contains(closest.x - 1, closest.y) ||
+                                    cell.mRect.contains(closest.x - 1, closest.y - 1)))
+                                continue;
+                            Vector2D dist_v = circ_pos.minus(closest);
+
+                            if (dist_v.length2() < mBallR / 2) {
+                                Vector2D offset = dist_v.unitVector().scalarMult(mBallR / 2 - dist_v.length2());
+
+                                mBall.mPosX += offset.x / mMetersToPixelsX;
+                                mBall.mPosY -= offset.y / mMetersToPixelsY;
+                                if(offset.x > 4)
+                                    mBall.mAccelX = 0;
+                                if(offset.y > 10)
+                                    mBall.mAccelY = 0;
                             }
                         }
-                        Paint other = new Paint();
-                        other.setColor(Color.parseColor("red"));
-                        canvas.drawLine(comx, comy, x, y, other);
-                        dx = comx - x;
-                        dy = comy - y;
-                        float dd = dx * dx + dy * dy;
-                        if(dd > (mBallH / 2) * (mBallW / 2))
-                            continue;
-                        else
-                        {
-                            /*cell.MakeColored();
-                            final float d = (float) Math.sqrt(convertToMeters(dx, true)*convertToMeters(dx, true) + convertToMeters(dy, false)*convertToMeters(dy, false));
-                            final float c = (0.5f * (sBallDiameter - d)) / d;
-                            mBall.mPosX -= convertToMeters(dx, true) * c;
-                            mBall.mPosY -= convertToMeters(dy, true) * c;
-                        }*/
-                    }
+
+                }
                 return retval;
             }
             public float convertToMeters(float pos, boolean x)
@@ -637,7 +585,7 @@ public class AccelerometerPlayActivity extends Activity {
                     return (pos - mXOrigin) / mMetersToPixelsX;
                 }
                 else
-                    return (pos + mYOrigin) / mMetersToPixelsY;
+                    return (mYOrigin - pos) / mMetersToPixelsY;
             }
 
             private float convertToPixels(float pos, boolean x)
@@ -664,19 +612,6 @@ public class AccelerometerPlayActivity extends Activity {
             public float getPosY() {
                 return mBall.mPosY;
             }
-
-            /*public ArrayList<Cell> getNeighbors(float x, float y)
-            {
-                ArrayList<Cell> retval = new ArrayList<Cell>();
-                int bx = (int)(x / mBallW);
-                int by = (int)(y / mBallH);
-                if(bx >= mCellArray.length || by >= mCellArray[0].length)
-                    return retval;
-                if(bx < 0 || by < 0)
-                    return retval;
-
-                return retval;
-            }*/
 
             public void draw(Canvas canvas) {
                 for (int i = 0; i < mCellArray.length; i++) {
@@ -730,9 +665,10 @@ public class AccelerometerPlayActivity extends Activity {
             opts.inPreferredConfig = Bitmap.Config.RGB_565;
             mWood = BitmapFactory.decodeResource(getResources(), R.drawable.wood, opts);
             mCellSystem = new CellSystem(mWood.getWidth(), mWood.getHeight(), dstWidth*1.05f, dstHeight*1.05f);
+            mCellSystem.setBallHW(dstHeight, dstWidth);
             mTextPaint = new Paint();
             mTextPaint.setColor(Color.parseColor("white"));
-            mTextPaint.setTextSize(12);
+            mTextPaint.setTextSize(24);
         }
 
         public void seeStuff(Context context) {
@@ -785,6 +721,8 @@ public class AccelerometerPlayActivity extends Activity {
             }
 
             mSensorTimeStamp = event.timestamp;
+            mSensorX /= 4;
+            mSensorY /= 4;
             mCpuTimeStamp = System.nanoTime();
         }
 
@@ -820,8 +758,6 @@ public class AccelerometerPlayActivity extends Activity {
             final float x = xc + cellSystem.getPosX() * xs;
             final float y = yc - cellSystem.getPosY() * ys;
             canvas.drawBitmap(bitmap, x, y, null);
-            String text = "X:" + String.format("%.4f", mCellSystem.convertToMeters(x, true)) + " Y:" + String.format("%.4f", mCellSystem.convertToMeters(y, false));
-            canvas.drawText(text, 0, text.length() - 1, x + sBallDiameter * xs * 1.01f, y + sBallDiameter * ys * 1.01f, mTextPaint);
 
             if(isFinished)
             {
